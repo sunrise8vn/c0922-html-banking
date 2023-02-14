@@ -7,8 +7,9 @@
     <title>Index</title>
     <link rel="stylesheet" href="./assets/bootstrap/v5.3.0/css/bootstrap.min.css">
     <link rel="stylesheet" href="./assets/fontawesome/v5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="./assets/sweetalert2/sweetalert2.min.css">
     <link rel="stylesheet" href="./assets/css/style.css">
-    <script src="./assets/bootstrap/v5.3.0/js/bootstrap.bundle.min.js"></script>
+    
 </head>
 <body>
     <div class="container">
@@ -36,7 +37,7 @@
                         <th>Phone</th>
                         <th>Balance</th>
                         <th>Address</th>
-                        <th colspan="3">Action</th>
+                        <th colspan="4">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -129,30 +130,66 @@
 
     <script src="./assets/jquery/jquery-v3.6.0.min.js"></script>
     <script src="./assets/jquery/jquery.validate.min.js"></script>
+    <script src="./assets/bootstrap/v5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="./assets/sweetalert2/sweetalert2.all.min.js"></script>
+    <script src="./assets/js/appbase.js"></script>
     
     <script>
-        
-        class Customer {
-            constructor(id, fullName, email, phone, address, balance) {
-                this.id = id;
-                this.fullName = fullName;
-                this.email = email;
-                this.phone = phone;
-                this.address = address;
-                this.balance = balance;
-            }
+
+        const page = {
+            urls: {
+                getAllCustomers: AppBase.DOMAIN_API + "/customers?deleted=0",
+                findCustomerById: AppBase.DOMAIN_API + "/customers",
+                createCustomer: AppBase.DOMAIN_API + "/customers",
+                updateCustomerById: AppBase.DOMAIN_API + "/customers",
+                deleteCustomerById: AppBase.DOMAIN_API + "/customers"
+            },
+            elements: {},
+            loadData: {},
+            commands: {}
         }
+        
 
         let customers = [];
         let currentCustomer = null;
 
 
-        $('#btnShowCreateModal').on('click', () => {
-            $('#modalCreate').modal('show');
+        page.elements.btnShowCreateModal = $('#btnShowCreateModal');
+        page.elements.modalCreate = $('#modalCreate');
+
+
+        page.loadData.getAllCustomers = () => {
+            $.ajax({
+                type: "GET",
+                url: page.urls.getAllCustomers
+            })
+            .done((data) => {
+                $.each(data, (i, item) => {
+                    let str = renderCustomer(item);
+                    $('#tbCustomer tbody').prepend(str);
+                })
+
+                addEventCreateCustomer();
+                addEventDeleteCustomer();
+            })
+            .fail((error) => {
+                console.error(error);
+            })
+        }
+
+
+        page.elements.btnShowCreateModal.on('click', () => {
+            page.elements.modalCreate.modal('show');
         })
 
-        let findCustomerById = (id) => {
-            return customers.find(item => item.id == id);
+        page.loadData.findCustomerById = (id) => {
+            return $.ajax({
+                type: "GET",
+                url: page.urls.findCustomerById + '/' + id
+            })
+            .fail((error) => {
+                console.error(error);
+            })
         }
 
         let updateCustomerById = (obj) => {
@@ -170,9 +207,7 @@
             $('.edit').on('click', function() {
                 let id = $(this).data('id');
 
-                let customer = findCustomerById(id);
-
-                if (customer !== undefined) {
+                page.loadData.findCustomerById(id).then((customer) => {
                     currentCustomer = customer;
 
                     $('#fullNameUp').val(customer.fullName);
@@ -181,10 +216,73 @@
                     $('#addressUp').val(customer.address);
 
                     $('#modalUpdate').modal('show');
-                }
-                else {
+
+                })
+                .catch(() => {
                     alert('Customer not found');
-                }
+                });
+            })
+        }
+
+        let addEventDeleteCustomer = () => {
+            $('.delete').on('click', function() {
+                let id = $(this).data('id');
+
+                AppBase.SweetAlert.showDeleteConfirmDialog().then(result => {
+                    if (result.isConfirmed) {
+                        page.commands.checkCustomerById(id).then(() => {
+                            page.commands.deleteCustomer(id);
+                        })
+                        .catch(() => {
+                            Swal.fire({
+                                position: 'center',
+                                icon: 'error',
+                                title: 'Customer not found',
+                            })
+                        })
+                    }
+                })
+            })
+        }
+
+        page.commands.checkCustomerById = (id) => {
+            return $.ajax({
+                type: 'PATCH',
+                url: page.urls.findCustomerById + '/' + id
+            })
+            .fail((error) => {
+                console.log(error);
+            })
+        }
+
+        page.commands.deleteCustomer = (id) => {
+            $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: 'PATCH',
+                url: page.urls.deleteCustomerById + '/' + id,
+                data: JSON.stringify({deleted: 1})
+            })
+            .done(() => {
+
+                $('#tr_' + id).remove();
+
+                Swal.fire({
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Customer has been deleted.',
+                    showConfirmButton: false,
+                    timer: 2000
+                })
+            })
+            .fail(() => {
+                Swal.fire({
+                    position: 'center',
+                    icon: 'error',
+                    title: 'Failed to delete customer',
+                })
             })
         }
 
@@ -192,31 +290,55 @@
             $('.edit').off('click');
         }
 
+        let removeEventDeleteCustomer = () => {
+            $('.delete').off('click');
+        }
+
         let doCreateCustomer = () => {
-            let id = generateId();
+            // let id = generateId();
             let fullName = $('#fullNameCre').val();
             let email = $('#emailCre').val();
             let phone = $('#phoneCre').val();
             let address = $('#addressCre').val();
             let balance = 0;
+            let deleted = 0;
 
             let customer = new Customer();
-            customer.id = id;
+            // customer.id = id;
             customer.fullName = fullName;
             customer.email = email;
             customer.phone = phone;
             customer.address = address;
             customer.balance = balance;
+            customer.deleted = deleted;
 
-            customers.push(customer);
+            // customers.push(customer);
 
-            let str = renderCustomer(customer);
-            $('#tbCustomer tbody').prepend(str);
-            
-            removeEventCreateCustomer();
-            addEventCreateCustomer();
+            $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: "POST",
+                url: page.urls.createCustomer,
+                data: JSON.stringify(customer)
+            })
+            .done((data) => {
+                customer = data;
 
-            $('#modalCreate').modal('hide');
+                let str = renderCustomer(customer);
+                $('#tbCustomer tbody').prepend(str);
+                
+                removeEventCreateCustomer();
+                addEventCreateCustomer();
+
+                $('#modalCreate').modal('hide');
+
+                AppBase.SweetAlert.showSuccessAlert('New customer is created successfully');
+            })
+            .fail((error) => {
+                AppBase.SweetAlert.showErrorAlert('Create new customer failed');
+            })
         }
 
         $('#btnCreateCustomer').on('click', () => {
@@ -236,17 +358,34 @@
             currentCustomer.phone = phone;
             currentCustomer.address = address;
 
-            updateCustomerById(currentCustomer);
+            // updateCustomerById(currentCustomer);
 
-            let newRow = renderCustomer(currentCustomer);
-            let currentRow = $('#tr_' + id);
+            $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: 'PATCH',
+                url: page.urls.updateCustomerById + '/' + id,
+                data: JSON.stringify(currentCustomer)
+            })
+            .done((data) => {
+                currentCustomer = data;
 
-            currentRow.replaceWith(newRow);
+                let newRow = renderCustomer(currentCustomer);
+                let currentRow = $('#tr_' + id);
 
-            removeEventCreateCustomer();
-            addEventCreateCustomer();
+                currentRow.replaceWith(newRow);
 
-            $('#modalUpdate').modal('hide');
+                removeEventCreateCustomer();
+                addEventCreateCustomer();
+
+                $('#modalUpdate').modal('hide');
+            })
+            .fail((error) => {
+                alert('Update customer failed');
+            })
+            
         })
 
         let generateId = () => {
@@ -277,9 +416,23 @@
                             <i class="fas fa-exchange-alt"></i>
                         </button>
                     </td>
+                    <td>
+                        <button class="btn btn-outline-danger delete" data-id="${item.id}">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         }
+
+
+        $('#modalCreate').on('hidden.bs.modal', () => {
+            $('#frmCreateCustomer')[0].reset();
+            $('#frmCreateCustomer').validate().resetForm();
+            
+            $('#modalCreate .modal-alert-danger').empty().removeClass("show").addClass("hide");
+            $('#frmCreateCustomer').find("input.error").removeClass("error");
+        })
 
         $('#frmCreateCustomer').validate({
             rules: {
@@ -323,6 +476,12 @@
                 doCreateCustomer();
             }
         });
+
+
+        $(() => {
+            page.loadData.getAllCustomers();
+        })
+
 
     </script>
 
