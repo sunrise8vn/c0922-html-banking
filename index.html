@@ -36,8 +36,10 @@
                         <th>Email</th>
                         <th>Phone</th>
                         <th>Balance</th>
+                        <th>Province</th>
+                        <th>District</th>
+                        <th>Ward</th>
                         <th>Address</th>
-                        <th colspan="4">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -49,7 +51,7 @@
 
     <!-- Modal Create -->
     <div id="modalCreate" class="modal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Modal create customer</h5>
@@ -59,21 +61,33 @@
                     <div class="modal-alert-danger hide"></div>
                     <form id="frmCreateCustomer" class="" method="post">
                         <div class="row mb-3">
-                            <div class="col-lg-6">
-                                <label for="fullName" class="form-label">Full name</label>
+                            <div class="col-lg-4">
+                                <label for="fullNameCre" class="form-label">Full name</label>
                                 <input type="text" class="form-control" id="fullNameCre" name="fullNameCre" />
                             </div>
-                            <div class="col-lg-6">
-                                <label for="email" class="form-label">Email</label>
+                            <div class="col-lg-4">
+                                <label for="emailCre" class="form-label">Email</label>
                                 <input type="email" class="form-control" id="emailCre" name="emailCre" />
+                            </div>
+                            <div class="col-lg-4">
+                                <label for="phoneCre" class="form-label">Phone</label>
+                                <input type="tel" class="form-control" id="phoneCre" name="phoneCre" />
                             </div>
                         </div>
                         <div class="row mb-3">
-                            <div class="mb-3 col-lg-6">
-                                <label for="phone" class="form-label">Phone</label>
-                                <input type="tel" class="form-control" id="phoneCre" name="phoneCre" />
+                            <div class="col-lg-3">
+                                <label for="provinceCre" class="form-label">Province</label>
+                                <select name="provinceCre" id="provinceCre" class="form-select"></select>
                             </div>
-                            <div class="mb-3 col-lg-6">
+                            <div class="col-lg-3">
+                                <label for="districtCre" class="form-label">District</label>
+                                <select name="districtCre" id="districtCre" class="form-select"></select>
+                            </div>
+                            <div class="col-lg-3">
+                                <label for="wardCre" class="form-label">Ward</label>
+                                <select name="wardCre" id="wardCre" class="form-select"></select>
+                            </div>
+                            <div class="col-lg-3">
                                 <label for="address" class="form-label">Address</label>
                                 <input type="text" class="form-control" id="addressCre" name="addressCre" />
                             </div>
@@ -201,11 +215,24 @@
         let customers = [];
         let currentCustomer = null;
 
+        let locationRegion = new LocationRegion();
+        let customer = new Customer();
         let deposit = new Deposit();
 
 
         page.elements.btnShowCreateModal = $('#btnShowCreateModal');
-        page.elements.modalCreate = $('#modalCreate');
+
+
+        page.dialogs.elements.modalCreate = $('#modalCreate');
+        page.dialogs.elements.frmCreateCustomer = $('#frmCreateCustomer');
+        page.dialogs.elements.fullNameCre = $('#fullNameCre');
+        page.dialogs.elements.emailCre = $('#emailCre');
+        page.dialogs.elements.phoneCre = $('#phoneCre');
+        page.dialogs.elements.provinceCre = $('#provinceCre');
+        page.dialogs.elements.districtCre = $('#districtCre');
+        page.dialogs.elements.wardCre = $('#wardCre');
+        page.dialogs.elements.addressCre = $('#addressCre');
+        page.dialogs.elements.btnCreate = $('#btnCreateCustomer')
 
         page.dialogs.elements.modalDeposit = $('#modalDeposit');
         page.dialogs.elements.frmDeposit = $('#frmDeposit');
@@ -222,7 +249,9 @@
             })
             .done((data) => {
                 $.each(data, (i, item) => {
-                    let str = renderCustomer(item);
+                    customer = item;
+                    locationRegion = customer.locationRegion;
+                    let str = renderCustomer(customer, locationRegion);
                     $('#tbCustomer tbody').prepend(str);
                 })
 
@@ -235,9 +264,60 @@
             })
         }
 
+        page.dialogs.loadData.getAllProvinces = () => {
+            return $.ajax({
+                type: 'GET',
+                url: 'https://vapi.vnappmob.com/api/province/'
+            })
+            .done((data) => {
+                $.each(data.results, (i, item) => {
+                    let str = `<option value="${item.province_id}">${item.province_name}</option>`;
+
+                    page.dialogs.elements.provinceCre.append(str);
+                })
+            })
+            .fail((jqXHR) => {
+                AppBase.SweetAlert.showErrorAlert('Load Provinces fail');
+            })
+        }
+
+        page.dialogs.loadData.getAllDistrictsByProvince = (provinceId) => {
+            return $.ajax({
+                type: 'GET',
+                url: 'https://vapi.vnappmob.com/api/province/district/' + provinceId
+            })
+            .done((data) => {
+                $.each(data.results, (i, item) => {
+                    let str = `<option value="${item.district_id}">${item.district_name}</option>`;
+
+                    page.dialogs.elements.districtCre.append(str);
+                })
+            })
+            .fail((jqXHR) => {
+                AppBase.SweetAlert.showErrorAlert('Load Districts fail');
+            })
+        }
+
+        page.dialogs.loadData.getAllWardsByDistrict = (districtId) => {
+            $.ajax({
+                type: 'GET',
+                url: 'https://vapi.vnappmob.com/api/province/ward/' + districtId
+            })
+            .done((data) => {
+                $.each(data.results, (i, item) => {
+                    let str = `<option value="${item.ward_id}">${item.ward_name}</option>`;
+
+                    page.dialogs.elements.wardCre.append(str);
+                })
+            })
+            .fail((jqXHR) => {
+                AppBase.SweetAlert.showErrorAlert('Load Wards fail');
+            })
+        }
+        
 
         page.elements.btnShowCreateModal.on('click', () => {
-            page.elements.modalCreate.modal('show');
+            page.dialogs.elements.modalCreate.modal('show');
         })
 
         page.loadData.findCustomerById = (id) => {
@@ -373,19 +453,33 @@
 
         let doCreateCustomer = () => {
             // let id = generateId();
-            let fullName = $('#fullNameCre').val();
-            let email = $('#emailCre').val();
-            let phone = $('#phoneCre').val();
-            let address = $('#addressCre').val();
+            let fullName = page.dialogs.elements.fullNameCre.val();
+            let email = page.dialogs.elements.emailCre.val();
+            let phone = page.dialogs.elements.phoneCre.val();
+            let provinceId = page.dialogs.elements.provinceCre.val();
+            let provinceName = page.dialogs.elements.provinceCre.find('option:selected').text();
+            let districtId = page.dialogs.elements.districtCre.val();
+            let districtName = page.dialogs.elements.districtCre.find('option:selected').text();
+            let wardId = page.dialogs.elements.wardCre.val();
+            let wardName = page.dialogs.elements.wardCre.find('option:selected').text();
+            let address = page.dialogs.elements.addressCre.val();
             let balance = 0;
             let deleted = 0;
 
-            let customer = new Customer();
-            // customer.id = id;
+            // locationRegion.id = null;
+            locationRegion.provinceId = provinceId;
+            locationRegion.provinceName = provinceName;
+            locationRegion.districtId = districtId;
+            locationRegion.districtName = districtName;
+            locationRegion.wardId = wardId;
+            locationRegion.wardName = wardName;
+            locationRegion.address = address;
+
+            customer.id = null;
             customer.fullName = fullName;
             customer.email = email;
             customer.phone = phone;
-            customer.address = address;
+            customer.locationRegion = locationRegion;
             customer.balance = balance;
             customer.deleted = deleted;
 
@@ -402,8 +496,9 @@
             })
             .done((data) => {
                 customer = data;
+                locationRegion = customer.locationRegion;
 
-                let str = renderCustomer(customer);
+                let str = renderCustomer(customer, locationRegion);
                 $('#tbCustomer tbody').prepend(str);
                 
                 removeEventCreateCustomer();
@@ -536,39 +631,42 @@
             return Math.random().toString(16).slice(13);
         }
 
-        let renderCustomer = (item) => {
+        let renderCustomer = (customer, locationRegion) => {
             return `
-                <tr id="tr_${item.id}">
-                    <td>${item.id}</td>
-                    <td>${item.fullName}</td>
-                    <td>${item.email}</td>
-                    <td>${item.phone}</td>
-                    <td>${item.balance}</td>
-                    <td>${item.address}</td>
-                    <td>
-                        <button class="btn btn-outline-secondary edit" data-id="${item.id}">
-                            <i class="far fa-edit"></i>
-                        </button>
-                    </td>
-                    <td>
-                        <button class="btn btn-outline-success deposit" data-id="${item.id}">
-                            <i class="fas fa-plus"></i>
-                        </button>
-                    </td>
-                    <td>
-                        <button class="btn btn-outline-primary">
-                            <i class="fas fa-exchange-alt"></i>
-                        </button>
-                    </td>
-                    <td>
-                        <button class="btn btn-outline-danger delete" data-id="${item.id}">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </td>
+                <tr id="tr_${customer.id}">
+                    <td>${customer.id}</td>
+                    <td>${customer.fullName}</td>
+                    <td>${customer.email}</td>
+                    <td>${customer.phone}</td>
+                    <td>${customer.balance}</td>
+                    <td>${locationRegion.provinceName}</td>
+                    <td>${locationRegion.districtName}</td>
+                    <td>${locationRegion.wardName}</td>
+                    <td>${locationRegion.address}</td>
                 </tr>
             `;
         }
 
+        // <td>
+        //     <button class="btn btn-outline-secondary edit" data-id="${item.id}">
+        //         <i class="far fa-edit"></i>
+        //     </button>
+        // </td>
+        // <td>
+        //     <button class="btn btn-outline-success deposit" data-id="${item.id}">
+        //         <i class="fas fa-plus"></i>
+        //     </button>
+        // </td>
+        // <td>
+        //     <button class="btn btn-outline-primary">
+        //         <i class="fas fa-exchange-alt"></i>
+        //     </button>
+        // </td>
+        // <td>
+        //     <button class="btn btn-outline-danger delete" data-id="${item.id}">
+        //         <i class="fas fa-trash-alt"></i>
+        //     </button>
+        // </td>
 
         $('#modalCreate').on('hidden.bs.modal', () => {
             $('#frmCreateCustomer')[0].reset();
@@ -660,6 +758,16 @@
 
         $(() => {
             page.loadData.getAllCustomers();
+
+            page.dialogs.loadData.getAllProvinces().then(() => {
+                let provinceId = page.dialogs.elements.provinceCre.find('option:eq(0)').prop('selected', true).val();
+                
+                page.dialogs.loadData.getAllDistrictsByProvince(provinceId).then(() => {
+                    let districtId = page.dialogs.elements.districtCre.find('option:eq(0)').prop('selected', true).val();
+                    
+                    page.dialogs.loadData.getAllWardsByDistrict(districtId);
+                });
+            });
         })
 
 
