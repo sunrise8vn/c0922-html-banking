@@ -128,6 +128,47 @@
         </div>
     </div>
 
+    <!-- Modal deposit -->
+    <div id="modalDeposit" class="modal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Modal deposit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-alert-danger hide"></div>
+                    <form id="frmDeposit" class="" method="post">
+                        <div class="row mb-3">
+                            <div class="col-lg-6">
+                                <label for="idDep" class="form-label">Id</label>
+                                <input type="text" class="form-control" id="idDep" name="idDep" readonly />
+                            </div>
+                            <div class="col-lg-6">
+                                <label for="fullNameDep" class="form-label">Full name</label>
+                                <input type="text" class="form-control" id="fullNameDep" name="fullNameDep" readonly />
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="mb-3 col-lg-6">
+                                <label for="balanceDep" class="form-label">Balance</label>
+                                <input type="text" class="form-control" id="balanceDep" name="balanceDep" readonly />
+                            </div>
+                            <div class="mb-3 col-lg-6">
+                                <label for="transactionAmountDep" class="form-label">TransactionAmount</label>
+                                <input type="text" class="form-control" id="transactionAmountDep" name="transactionAmountDep" />
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-light" id="btnDeposit">Deposit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="./assets/jquery/jquery-v3.6.0.min.js"></script>
     <script src="./assets/jquery/jquery.validate.min.js"></script>
     <script src="./assets/bootstrap/v5.3.0/js/bootstrap.bundle.min.js"></script>
@@ -142,21 +183,37 @@
                 findCustomerById: AppBase.DOMAIN_API + "/customers",
                 createCustomer: AppBase.DOMAIN_API + "/customers",
                 updateCustomerById: AppBase.DOMAIN_API + "/customers",
+                doDeposit: AppBase.DOMAIN_API + '/deposits',
+                deleteDeposit: AppBase.DOMAIN_API + '/deposits',
                 deleteCustomerById: AppBase.DOMAIN_API + "/customers"
             },
             elements: {},
             loadData: {},
-            commands: {}
+            commands: {},
+            dialogs: {
+                elements: {},
+                loadData: {},
+                commands: {}
+            }
         }
         
 
         let customers = [];
         let currentCustomer = null;
 
+        let deposit = new Deposit();
+
 
         page.elements.btnShowCreateModal = $('#btnShowCreateModal');
         page.elements.modalCreate = $('#modalCreate');
 
+        page.dialogs.elements.modalDeposit = $('#modalDeposit');
+        page.dialogs.elements.frmDeposit = $('#frmDeposit');
+        page.dialogs.elements.idDep =$('#idDep');
+        page.dialogs.elements.fullNameDep =$('#fullNameDep');
+        page.dialogs.elements.balanceDep =$('#balanceDep');
+        page.dialogs.elements.transactionAmountDep =$('#transactionAmountDep');
+        page.dialogs.elements.btnDeposit =$('#btnDeposit');
 
         page.loadData.getAllCustomers = () => {
             $.ajax({
@@ -170,6 +227,7 @@
                 })
 
                 addEventCreateCustomer();
+                page.dialogs.commands.addEventDeposit();
                 addEventDeleteCustomer();
             })
             .fail((error) => {
@@ -241,6 +299,25 @@
                             })
                         })
                     }
+                })
+            })
+        }
+
+        page.dialogs.commands.addEventDeposit = () => {
+            $('.deposit').on('click', function () {
+                let customerId = $(this).data('id');
+
+                page.loadData.findCustomerById(customerId).then((data) => {
+                    currentCustomer = data;
+
+                    page.dialogs.elements.idDep.val(currentCustomer.id);
+                    page.dialogs.elements.fullNameDep.val(currentCustomer.fullName);
+                    page.dialogs.elements.balanceDep.val(currentCustomer.balance);
+
+                    page.dialogs.elements.modalDeposit.modal('show');
+                })
+                .catch(() => {
+                    AppBase.SweetAlert.showErrorAlert('Customer not found');
                 })
             })
         }
@@ -388,6 +465,73 @@
             
         })
 
+        page.dialogs.elements.btnDeposit.on('click', () => {
+            page.dialogs.elements.frmDeposit.trigger('submit');
+        })
+
+
+        page.dialogs.commands.doDeposit = () => {
+            let currentBalance = currentCustomer.balance;
+            let transactionAmountDep = +page.dialogs.elements.transactionAmountDep.val();
+            let newBalance = currentBalance + transactionAmountDep;
+            currentCustomer.balance = newBalance;
+
+            deposit.fullName = currentCustomer.fullName;
+            deposit.transactionAmount = transactionAmountDep;
+
+            page.dialogs.commands.createDeposit().then((data) => {
+                page.dialogs.commands.incrementCustomerBalance(currentCustomer).then(() => {
+                    AppBase.SweetAlert.showSuccessAlert('Deposit success');
+                })
+                .catch(() => {
+                    page.dialogs.commands.deleteDeposit(deposit);
+
+                    AppBase.SweetAlert.showErrorAlert('Update customer fail');
+                });
+            })
+            .catch(() => {
+                AppBase.SweetAlert.showErrorAlert('Deposit fail');
+            });
+        }
+
+        page.dialogs.commands.createDeposit = () => {
+            return $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: 'POST',
+                url: page.urls.doDeposit,
+                data: JSON.stringify(deposit)
+            })
+            .done((data) => {
+                deposit = data;
+            })
+        }
+
+        page.dialogs.commands.incrementCustomerBalance = (customer) => {
+            return $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: 'PATCH',
+                url: page.urls.updateCustomerById + '/' + customer.id,
+                data: JSON.stringify(customer)
+            })
+        }
+
+        page.dialogs.commands.deleteDeposit = () => {
+            $.ajax({
+                headers: {
+                    'accept': 'application/json',
+                    'content-type': 'application/json'
+                },
+                type: 'DELETE',
+                url: page.urls.deleteDeposit + '/' + deposit.id
+            })
+        }
+
         let generateId = () => {
             return Math.random().toString(16).slice(13);
         }
@@ -407,7 +551,7 @@
                         </button>
                     </td>
                     <td>
-                        <button class="btn btn-outline-success">
+                        <button class="btn btn-outline-success deposit" data-id="${item.id}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </td>
@@ -474,6 +618,42 @@
             },
             submitHandler: function () {
                 doCreateCustomer();
+            }
+        });
+
+
+        page.dialogs.elements.frmDeposit.validate({
+            rules: {
+                transactionAmountDep: {
+                    required: true,
+                    number: true,
+                    min: 1000,
+                    max: 1000000
+                }
+            },
+            messages: {
+                transactionAmountDep: {
+                    required: 'Transaction amount is required',
+                    number: 'Transaction amount must be number',
+                    min: 'Transaction amount must be more than ${0}',
+                    max: 'Transaction amount must be less than ${0}'
+                }
+            },
+            errorLabelContainer: "#modalDeposit .modal-alert-danger",
+            errorPlacement: function (error, element) {
+                error.appendTo("#modalDeposit .modal-alert-danger");
+            },
+            showErrors: function(errorMap, errorList) {
+                if (this.numberOfInvalids() > 0) {
+                    $("#modalDeposit .modal-alert-danger").removeClass("hide").addClass("show");
+                } else {
+                    $("#modalDeposit .modal-alert-danger").removeClass("show").addClass("hide").empty();
+                    $("#frmDeposit input.error").removeClass("error");
+                }
+                this.defaultShowErrors();
+            },
+            submitHandler: function () {
+                page.dialogs.commands.doDeposit();
             }
         });
 
